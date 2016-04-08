@@ -94,7 +94,7 @@ assocTestSeq <- function(	seqData,
 	# set up results for variants
 	nvm <- c("variantID", "allele", "chr", "pos", "n.obs", "freq", "weight")
 	variantInfo <- list()
-	
+
 
 	# get residuals and sqrt of Projection matrix
 	proj <- .calculateProjection(nullModObj = nullModObj, test = test, burden.test = burden.test)
@@ -570,7 +570,10 @@ assocTestSeqWindow <- function(	seqData,
 		param[["weight.beta"]] <- FALSE
 		if(!(weight.user %in% varLabels(variantData(seqData)))){ stop("The variable specified for weight.user must be in the variantData slot of seqData") }
 		param[["weight.user"]] <- weight.user
-	}	
+	}
+
+	param[["family"]] <- family
+	param[["mixedmodel"]] <- mixedmodel
 	
 	# check that test is valid
 	if(!is.element(test,c("Burden","SKAT"))){ stop("test must be Burden or SKAT") }
@@ -587,9 +590,7 @@ assocTestSeqWindow <- function(	seqData,
 		if(mixedmodel & family == "binomial"){
 			if(!is.element(burden.test,c("Score"))){ stop("burden.test must be Score for a mixed model with binomial family")}
 		}
-		param[["burden.test"]] <- burden.test
-		param[["family"]] <- family
-		param[["mixedmodel"]] <- mixedmodel
+		param[["burden.test"]] <- burden.test		
 	}	
 	if(test == "SKAT"){
 		# check rho value
