@@ -1,7 +1,7 @@
 assocTestSeq <- function(	seqData,
 							nullModObj,
 							aggVarList,
-							AF.scan = NULL,
+							AF.sample = NULL,
 							AF.range = c(0,1),
 							weight.beta = c(0.5,0.5),
 							weight.user = NULL,
@@ -28,16 +28,16 @@ assocTestSeq <- function(	seqData,
 	# set up a filter
 	seqSetFilter(seqData, sample.id = scan.include$value, verbose=FALSE)
 	
-	# logical of scans to use for Allele Frequency calculations
-	if(is.null(AF.scan)){
-		AF.scan.use <- rep(TRUE, scan.include$n)
+	# logical of samples to use for Allele Frequency calculations
+	if(is.null(AF.sample)){
+		AF.sample.use <- rep(TRUE, scan.include$n)
 	}else{
-		AF.scan.use <- scan.include$value %in% AF.scan
+		AF.sample.use <- scan.include$value %in% AF.sample
 	}
-	nscan <- list()
-	nscan[["analysis"]] <- scan.include$n
-	nscan[["AF"]] <- sum(AF.scan.use)
-	out[["nscan"]] <- nscan
+	nsample <- list()
+	nsample[["analysis"]] <- scan.include$n
+	nsample[["AF"]] <- sum(AF.sample.use)
+	out[["nsample"]] <- nsample
 	
 	# check that all variants in aggVarList are in genoData
 	variant.include <- as.vector(unlist(sapply(aggVarList, function(x){ x$variant.id })))
@@ -45,7 +45,7 @@ assocTestSeq <- function(	seqData,
 	
 
 	# set up main results matrix
-	nv <- c("n.site", "n.scan.alt")
+	nv <- c("n.site", "n.sample.alt")
 	if(test == "Burden"){
 		nv <- append(nv, "burden.skew")
 		if(burden.test == "Score"){		
@@ -54,16 +54,34 @@ assocTestSeq <- function(	seqData,
 			nv <- append(nv, c("Est", "SE", "Wald.stat", "Wald.pval"))
 		}else if(burden.test == "Firth"){
 			nv <- append(nv, c("Est", "SE", "Firth.stat", "Firth.pval"))
-		}		
-		if(verbose) message("Performing ", burden.test, " Burden Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights from a Beta(", weight.beta[1], ",", weight.beta[2], ") distribution")
-
+		}
+		if(verbose){
+			if(is.null(weight.user)){
+				message("Performing ", burden.test, " Burden Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights from a Beta(", weight.beta[1], ",", weight.beta[2], ") distribution")
+			}else{
+				message("Performing ", burden.test, " Burden Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights specified by ", weight.user, " in the variantData slot of seqData")			
+			}
+		}	
+		
 	}else if(test == "SKAT"){
 		nv <- append(nv, c(paste("Q",rho,sep="_"), paste("pval",rho,sep="_"), paste("err",rho,sep="_")))
 		if(length(rho) == 1){			
-			if(verbose) message("Performing SKAT Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights from a Beta(", weight.beta[1], ",", weight.beta[2], ") distribution and rho = ", rho)
+			if(verbose){
+				if(is.null(weight.user)){
+					message("Performing SKAT Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights from a Beta(", weight.beta[1], ",", weight.beta[2], ") distribution and rho = ", rho)
+				}else{
+					message("Performing SKAT Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights specified by ", weight.user, " in the variantData slot of seqData and rho = ", rho)
+				}
+			}
 		}else{
 			nv <- append(nv, c("min.pval", "opt.rho", "pval_SKATO"))
-			if(verbose) message("Performing SKAT-O Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights from a Beta(", weight.beta[1], ",", weight.beta[2], ") distribution and rho = (", paste(rho, collapse=", "), ")")
+			if(verbose){
+				if(is.null(weight.user)){
+					message("Performing SKAT-O Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights from a Beta(", weight.beta[1], ",", weight.beta[2], ") distribution and rho = (", paste(rho, collapse=", "), ")")
+				}else{
+					message("Performing SKAT-O Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights specified by ", weight.user, " in the variantData slot of seqData and rho = (", paste(rho, collapse=", "), ")")
+				}
+			}
 		}		
 	}
 
@@ -77,8 +95,6 @@ assocTestSeq <- function(	seqData,
 	nvm <- c("variantID", "allele", "chr", "pos", "n.obs", "freq", "weight")
 	variantInfo <- list()
 	
-
-	if(verbose) message("Beginning Calculations...")
 
 	# get residuals and sqrt of Projection matrix
 	proj <- .calculateProjection(nullModObj = nullModObj, test = test, burden.test = burden.test)
@@ -118,7 +134,7 @@ assocTestSeq <- function(	seqData,
 		variantRes[,"n.obs"] <- nrow(geno) - n.miss
 
 		# calculate allele frequencies
-		freq <- alleleFreq(geno = geno, chromChar = chromChar, sex = NULL, scan.use = AF.scan.use)
+		freq <- alleleFreq(geno = geno, chromChar = chromChar, sex = NULL, sample.use = AF.sample.use)
 		variantRes[,"freq"] <- freq
 
 		# index of those inside the allele freq threshold
@@ -138,8 +154,8 @@ assocTestSeq <- function(	seqData,
 			geno <- geno[, include, drop = FALSE]
 			freq <- freq[include]
 
-			# calculate number of scans with observed alternate alleles > 0
-			resMain[b,"n.scan.alt"] <- sum(rowSums(geno, na.rm=TRUE) > 0)
+			# calculate number of samples with observed alternate alleles > 0
+			resMain[b,"n.sample.alt"] <- sum(rowSums(geno, na.rm=TRUE) > 0)
 
 			# variant weights
 			if(is.null(weight.user)){
@@ -210,7 +226,7 @@ assocTestSeqWindow <- function(	seqData,
 								chromosome = NULL,
 								window.size = 50,
 								window.shift = 20,
-								AF.scan = NULL,
+								AF.sample = NULL,
 								AF.range = c(0,1),
 								weight.beta = c(0.5, 0.5),
 								weight.user = NULL,
@@ -249,16 +265,16 @@ assocTestSeqWindow <- function(	seqData,
 	# set up a filter
 	seqSetFilter(seqData, sample.id = scan.include$value, verbose=FALSE)	
 
-	# logical of scans to use for Allele Frequency calculations
-	if(is.null(AF.scan)){
-		AF.scan.use <- rep(TRUE, scan.include$n)
+	# logical of samples to use for Allele Frequency calculations
+	if(is.null(AF.sample)){
+		AF.sample.use <- rep(TRUE, scan.include$n)
 	}else{
-		AF.scan.use <- scan.include$value %in% AF.scan
+		AF.sample.use <- scan.include$value %in% AF.sample
 	}
-	nscan <- list()
-	nscan[["analysis"]] <- scan.include$n
-	nscan[["AF"]] <- sum(AF.scan.use)
-	out[["nscan"]] <- nscan
+	nsample <- list()
+	nsample[["analysis"]] <- scan.include$n
+	nsample[["AF"]] <- sum(AF.sample.use)
+	out[["nsample"]] <- nsample
 
 	# check Variants and set filter - filters monomorphic reference alleles
 	variant.include <- getVariantInclude(data = seqData, variant.include = variant.include, chromosome = chromosome)
@@ -294,7 +310,7 @@ assocTestSeqWindow <- function(	seqData,
 				if(is.null(weight.user)){
 					message("Performing SKAT Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights from a Beta(", weight.beta[1], ",", weight.beta[2], ") distribution and rho = ", rho)
 				}else{
-					message("Performing SKAT Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights specified by ", weight.user, "in the variantData slot of seqData and rho = ", rho)
+					message("Performing SKAT Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights specified by ", weight.user, " in the variantData slot of seqData and rho = ", rho)
 				}
 			}
 		}else{
@@ -303,7 +319,7 @@ assocTestSeqWindow <- function(	seqData,
 				if(is.null(weight.user)){
 					message("Performing SKAT-O Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights from a Beta(", weight.beta[1], ",", weight.beta[2], ") distribution and rho = (", paste(rho, collapse=", "), ")")
 				}else{
-					message("Performing SKAT-O Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights specified by ", weight.user, "in the variantData slot of seqData and rho = (", paste(rho, collapse=", "), ")")
+					message("Performing SKAT-O Tests for Variants with AF in [", AF.range[1], ",", AF.range[2], "] using weights specified by ", weight.user, " in the variantData slot of seqData and rho = (", paste(rho, collapse=", "), ")")
 				}
 			} 
 		}
@@ -313,9 +329,7 @@ assocTestSeqWindow <- function(	seqData,
 	# set up results for variants
 	nvm <- c("variantID", "allele", "chr", "pos", "n.obs", "freq", "weight")
 	variantInfo <- matrix(NA, nrow=0, ncol=length(nvm), dimnames = list(NULL,nvm))
-		
 
-	if(verbose) message("Beginning Calculations...")
 
 	# get residuals and sqrt of Projection matrix
 	proj <- .calculateProjection(nullModObj = nullModObj, test = test, burden.test = burden.test)
@@ -420,7 +434,7 @@ assocTestSeqWindow <- function(	seqData,
 					variantRes[,"n.obs"] <- nrow(geno.add) - n.miss
 
 					# calculate allele frequencies
-					freq <- alleleFreq(geno = geno.add, chromChar = chromChar, sex = NULL, scan.use = AF.scan.use)
+					freq <- alleleFreq(geno = geno.add, chromChar = chromChar, sex = NULL, sample.use = AF.sample.use)
 					variantRes[,"freq"] <- freq
 
 					# index of those inside the allele freq threshold

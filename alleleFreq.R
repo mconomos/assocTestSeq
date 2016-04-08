@@ -1,4 +1,4 @@
-alleleFreq <- function(geno, chromChar, sex, scan.use){
+alleleFreq <- function(geno, chromChar, sex, sample.use){
     # type of chromosome for each SNP
     xchr <- chromChar == "X"
     ychr <- chromChar == "Y"
@@ -8,12 +8,12 @@ alleleFreq <- function(geno, chromChar, sex, scan.use){
     freq <- rep(NA, ncol(geno))
 
     # autosomes
-    freq[auto] <- 0.5*colMeans(geno[scan.use, auto, drop=FALSE], na.rm=TRUE)
+    freq[auto] <- 0.5*colMeans(geno[sample.use, auto, drop=FALSE], na.rm=TRUE)
 
     # xchr
     if(sum(xchr) > 0){
-        female <- sex == "F" & scan.use
-        male <- sex == "M" & scan.use
+        female <- sex == "F" & sample.use
+        male <- sex == "M" & sample.use
         F.count <- colSums(geno[female, xchr, drop = FALSE], na.rm = TRUE)
         F.nsamp <- colSums(!is.na(geno[female, xchr, drop = FALSE]))
         M.count <- 0.5*colSums(geno[male, xchr, drop = FALSE], na.rm = TRUE)
@@ -23,7 +23,7 @@ alleleFreq <- function(geno, chromChar, sex, scan.use){
     
     # ychr
     if(sum(ychr) > 0){
-        male <- sex == "M" & scan.use
+        male <- sex == "M" & sample.use
         freq[ychr] <- 0.5*colMeans(geno[male, ychr, drop = FALSE], na.rm=TRUE)
     }
 
